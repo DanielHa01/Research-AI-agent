@@ -24,7 +24,7 @@ init_db()
 app = FastAPI(title="Research Agent API", version="1.0.0")
 
 ALLOWED_ORIGINS = [
-    "https://DanielHa01.github.io",
+    "https://danielha01.github.io",
 ]
 
 if os.getenv("ENVIRONMENT") == "dev":
