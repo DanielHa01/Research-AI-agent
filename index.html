@@ -434,7 +434,7 @@
 
         listEl.innerHTML = reports
           .map((r) => `
-            <div class="history-item" onclick="loadReportById(${r.id})">
+            <div class="history-item" data-id="${r.id}" onclick="loadReportById(${r.id})">
               <div class="history-item-topic">
                 ${escapeHtml(r.topic)}
               </div>

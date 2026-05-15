@@ -1,3 +1,11 @@
+![Python](https://img.shields.io/badge/Python-3.11+-blue?logo=python)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.111-green?logo=fastapi)
+![Groq](https://img.shields.io/badge/LLM-Groq%20Llama%203.1-orange)
+![Gemini](https://img.shields.io/badge/Chat-Gemini%202.5%20Flash-blue?logo=google)
+![Deployed on Render](https://img.shields.io/badge/Backend-Render-46E3B7?logo=render)
+![Frontend on GitHub Pages](https://img.shields.io/badge/Frontend-GitHub%20Pages-222?logo=github)
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow)
+
 # Research Agent
 
 An autonomous, multi-step research agent that decomposes complex queries into sub-questions, searches the web, and synthesizes structured, expert-level reports with citations.
