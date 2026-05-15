@@ -58,7 +58,6 @@ def chat_with_report(
         system_instruction=system_instruction,
     )
 
-    # Reconstruct chat session with history
     chat_session = model.start_chat(history=history)
 
     try:

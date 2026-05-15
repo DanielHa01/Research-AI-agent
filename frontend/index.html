@@ -37,7 +37,7 @@
   <script src="https://unpkg.com/lucide@latest"></script>
 
   <script>
-    const API_URL = "http://localhost:8000";
+    const API_URL = "https://research-ai-agent-hau3.onrender.com";
     
     async function runResearch() {
       const topic = document.getElementById("topic-input").value.trim();
@@ -79,7 +79,6 @@
       initDeepDive(questions);
     }
 
-    // --- Deep Dive Logic ---
     const deepDivedQuestions = new Set();
 
     function initDeepDive(subQuestions) {
@@ -467,7 +466,6 @@
         const reportContainer = document.getElementById("report-container");
         if (reportContainer) reportContainer.scrollIntoView({ behavior: "smooth" });
 
-        // Close sidebar after selection
         toggleSidebar();
       } catch (err) {
         alert(`Could not load report: ${err.message}`);

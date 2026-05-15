@@ -30,19 +30,15 @@ REQUIRED_SECTIONS = ["## Executive Summary", "## Key Findings", "## Sources", "#
 def score_report(report: str) -> dict:
     scores = {}
 
-    # Completeness: check for required sections
     section_score = sum(1 for s in REQUIRED_SECTIONS if s in report)
     scores["completeness"] = min(section_score, 3)
 
-    # Source count
     source_count = report.count("http")
     scores["sources"] = 2 if source_count >= 3 else (1 if source_count >= 1 else 0)
 
-    # Length
     word_count = len(report.split())
     scores["length"] = 2 if word_count >= 300 else (1 if word_count >= 150 else 0)
 
-    # No hallucination markers
     bad_phrases = ["i don't know", "i cannot", "i'm not sure", "as an ai"]
     has_bad = any(p in report.lower() for p in bad_phrases)
     scores["no_hallucination"] = 0 if has_bad else 3

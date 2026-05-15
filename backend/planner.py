@@ -36,7 +36,6 @@ def decompose_query(topic: str) -> list[str]:
         temperature=0.3,
     )
     content = response.choices[0].message.content.strip()
-    # Strip markdown code fences if present
     content = content.replace("```json", "").replace("```", "").strip()
     questions = json.loads(content)
     if not isinstance(questions, list):

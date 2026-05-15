@@ -5,6 +5,7 @@ Endpoints:
   GET  /health    — health check
 """
 
+import os
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -22,11 +23,21 @@ init_db()
 
 app = FastAPI(title="Research Agent API", version="1.0.0")
 
+ALLOWED_ORIGINS = [
+    "https://DanielHa01.github.io",
+]
+
+if os.getenv("ENVIRONMENT") == "dev":
+    ALLOWED_ORIGINS += [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Lock this down in production
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_methods=["POST", "GET", "DELETE"],
+    allow_headers=["Content-Type"],
 )
 
 class ResearchRequest(BaseModel):

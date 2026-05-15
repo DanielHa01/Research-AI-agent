@@ -11,7 +11,6 @@ class AgentMemory:
     topic: str
     sub_questions: list[str] = field(default_factory=list)
     findings: list[dict] = field(default_factory=list)
-    # findings format: [{question, summaries: [{summary, url}]}]
 
     def add_finding(self, question: str, summaries: list[dict]):
         self.findings.append({

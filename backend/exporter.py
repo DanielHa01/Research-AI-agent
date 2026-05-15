@@ -13,9 +13,6 @@ import markdown
 from weasyprint import HTML, CSS
 from datetime import datetime, timezone
 
-
-# ── CSS applied to the PDF (embedded, not a file) ──────────────────────────
-
 PDF_CSS = CSS(string="""
   @page {
     size: A4;
@@ -135,13 +132,11 @@ def markdown_to_pdf(topic: str, report_markdown: str) -> bytes:
     """
     generated_at = datetime.now(timezone.utc).strftime("%B %d, %Y at %H:%M UTC")
 
-    # Convert Markdown → HTML (preserve fenced code blocks and tables)
     body_html = markdown.markdown(
         report_markdown,
         extensions=["fenced_code", "tables", "nl2br"],
     )
 
-    # Wrap in a full HTML document with meta header and watermark
     full_html = f"""
     <!DOCTYPE html>
     <html lang="en">
