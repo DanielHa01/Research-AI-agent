@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Research Agent</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main>
+    <h1>Research Agent</h1>
+    <p class="subtitle">Enter any topic and get a structured research report in seconds.</p>
+
+    <div class="input-row">
+      <input
+        id="topic-input"
+        type="text"
+        placeholder="e.g. The current state of fusion energy"
+        autocomplete="off"
+      />
+      <button id="run-btn" onclick="runResearch()">Research ↗</button>
+    </div>
+
+    <div id="status" class="status hidden"></div>
+
+    <div id="sub-questions" class="sub-questions hidden">
+      <h3>Sub-questions being researched:</h3>
+      <ul id="sq-list"></ul>
+    </div>
+
+    <div id="report-container" class="report hidden">
+      <div id="report-content"></div>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <script>
+    const API_URL = "http://localhost:8000";
+    
+    async function runResearch() {
+      const topic = document.getElementById("topic-input").value.trim();
+      if (!topic) return;
+
+      setStatus("Thinking and planning sub-questions...", true);
+      hideReport();
+
+      try {
+        const res = await fetch(`${API_URL}/research`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ topic }),
+        });
+
+        if (!res.ok) throw new Error(`API error: ${res.status}`);
+        const data = await res.json();
+
+        showSubQuestions(data.sub_questions);
+        setStatus("Report ready.", false);
+        window.currentReportMarkdown = data.report;
+        showReport(data.report, true);
+      } catch (err) {
+        setStatus(`Error: ${err.message}`, false);
+      }
+    }
+
+    function setStatus(msg, loading) {
+      const el = document.getElementById("status");
+      el.textContent = loading ? `⏳ ${msg}` : msg;
+      el.classList.remove("hidden");
+    }
+
+    function showSubQuestions(questions) {
+      const container = document.getElementById("sub-questions");
+      const list = document.getElementById("sq-list");
+      list.innerHTML = questions.map(q => `<li>${q}</li>`).join("");
+      container.classList.remove("hidden");
+      initDeepDive(questions);
+    }
+
+    // --- Deep Dive Logic ---
+    const deepDivedQuestions = new Set();
+
+    function initDeepDive(subQuestions) {
+      deepDivedQuestions.clear();
+      const listEl = document.getElementById("sq-list");
+      if (!listEl) return;
+
+      const items = listEl.querySelectorAll("li");
+      items.forEach((li, index) => {
+        const question = subQuestions[index];
+        if (!question) return;
+
+        const textSpan = document.createElement("span");
+        textSpan.textContent = li.textContent;
+        li.textContent = "";
+        li.appendChild(textSpan);
+
+        const btn = document.createElement("button");
+        btn.className = "deep-dive-btn";
+        btn.dataset.question = question;
+        btn.dataset.index = index;
+        btn.innerHTML = `<i data-lucide="microscope" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;"></i> Deep Dive`;
+        btn.onclick = () => triggerDeepDive(question, index, btn);
+        li.appendChild(btn);
+
+        const resultDiv = document.createElement("div");
+        resultDiv.id = `deep-dive-result-${index}`;
+        resultDiv.className = "deep-dive-result hidden";
+        li.after(resultDiv);
+      });
+      lucide.createIcons();
+    }
+
+    async function triggerDeepDive(question, index, btn) {
+      if (deepDivedQuestions.has(question)) {
+        toggleDeepDive(index);
+        return;
+      }
+
+      btn.innerHTML = `<i data-lucide="loader-2" class="animate-spin" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;"></i> Researching...`;
+      btn.disabled = true;
+      lucide.createIcons();
+
+      const resultDiv = document.getElementById(`deep-dive-result-${index}`);
+
+      try {
+        const res = await fetch(`${API_URL}/deep-dive`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question }),
+        });
+
+        if (!res.ok) throw new Error(`API error: ${res.status}`);
+        const data = await res.json();
+
+        deepDivedQuestions.add(question);
+
+        const angleTags = data.angles
+          .map(a => `<span class="angle-tag">${escapeHtml(a)}</span>`)
+          .join("");
+
+        const reportHTML = marked.parse(data.deep_report);
+
+        resultDiv.innerHTML = `
+          <div class="deep-dive-header">
+            <span class="deep-dive-label"><i data-lucide="microscope" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 6px;"></i> Deep Dive</span>
+            <button class="deep-dive-collapse-btn" onclick="toggleDeepDive(${index})">▲ Collapse</button>
+          </div>
+          <div class="deep-dive-angles">
+            <span class="angles-label">Angles explored:</span>
+            ${angleTags}
+          </div>
+          <div class="deep-dive-report">${reportHTML}</div>
+        `;
+        resultDiv.classList.remove("hidden");
+
+        btn.innerHTML = `<i data-lucide="microscope" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;"></i> Deep Dive ▲`;
+        btn.disabled = false;
+        btn.onclick = () => toggleDeepDive(index);
+        lucide.createIcons();
+
+        resultDiv.scrollIntoView({ behavior: "smooth", block: "start" });
+
+      } catch (err) {
+        resultDiv.innerHTML = `<p class="deep-dive-error">⚠️ Deep dive failed: ${escapeHtml(err.message)}</p>`;
+        resultDiv.classList.remove("hidden");
+        btn.innerHTML = `<i data-lucide="microscope" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;"></i> Deep Dive`;
+        btn.disabled = false;
+        lucide.createIcons();
+      }
+    }
+
+    function toggleDeepDive(index) {
+      const resultDiv = document.getElementById(`deep-dive-result-${index}`);
+      const btn = document.querySelector(`[data-index="${index}"].deep-dive-btn`);
+      if (!resultDiv) return;
+
+      const isHidden = resultDiv.classList.toggle("hidden");
+      if (btn) {
+        btn.innerHTML = isHidden 
+          ? `<i data-lucide="microscope" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;"></i> Deep Dive ▼` 
+          : `<i data-lucide="microscope" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;"></i> Deep Dive ▲`;
+        lucide.createIcons();
+      }
+    }
+
+    function showReport(markdown, isNewResearch = false) {
+      const container = document.getElementById("report-container");
+      const content = document.getElementById("report-content");
+      content.innerHTML = marked.parse(markdown);
+
+      let dlBtn = document.getElementById("pdf-download-btn");
+      if (!dlBtn) {
+        dlBtn = document.createElement("button");
+        dlBtn.id = "pdf-download-btn";
+        dlBtn.innerHTML = `<i data-lucide="file-text" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 6px;"></i> Download PDF`;
+        dlBtn.onclick = downloadPDF;
+        container.prepend(dlBtn);
+        lucide.createIcons();
+      }
+
+      container.classList.remove("hidden");
+      initChat(markdown);
+      if (isNewResearch && typeof loadHistory === 'function') {
+        loadHistory();
+      }
+    }
+
+    function hideReport() {
+      document.getElementById("report-container").classList.add("hidden");
+      document.getElementById("sub-questions").classList.add("hidden");
+      const chatPanel = document.getElementById("chat-panel");
+      if (chatPanel) chatPanel.remove();
+    }
+
+    document.getElementById("topic-input").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") runResearch();
+    });
+
+    async function downloadPDF() {
+      const btn = document.getElementById("pdf-download-btn");
+      const topic = document.getElementById("topic-input").value.trim();
+
+      const reportMarkdown = window.currentReportMarkdown || "";
+      if (!reportMarkdown) {
+        alert("No report to export.");
+        return;
+      }
+
+      btn.innerHTML = `<i data-lucide="loader-2" class="animate-spin" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 6px;"></i> Generating PDF...`;
+      btn.disabled = true;
+      lucide.createIcons();
+
+      try {
+        const res = await fetch(`${API_URL}/export/pdf`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ topic, report: reportMarkdown }),
+        });
+
+        if (!res.ok) throw new Error(`Export failed: ${res.status}`);
+
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        const safeTopic = (topic || "report").replace(/\s+/g, "-").slice(0, 40);
+        a.download = `research-${safeTopic}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        btn.innerHTML = `<i data-lucide="check" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 6px;"></i> Downloaded!`;
+        lucide.createIcons();
+        setTimeout(() => {
+          btn.innerHTML = `<i data-lucide="file-text" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 6px;"></i> Download PDF`;
+          btn.disabled = false;
+          lucide.createIcons();
+        }, 2500);
+      } catch (err) {
+        alert(`PDF export error: ${err.message}`);
+        btn.innerHTML = `<i data-lucide="file-text" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 6px;"></i> Download PDF`;
+        btn.disabled = false;
+        lucide.createIcons();
+      }
+    }
+
+    let chatHistory = [];
+    let currentReport = "";
+
+    function initChat(reportMarkdown) {
+      currentReport = reportMarkdown;
+      chatHistory = [];
+
+      const existing = document.getElementById("chat-panel");
+      if (existing) existing.remove();
+
+      const panel = document.createElement("div");
+      panel.id = "chat-panel";
+      panel.innerHTML = `
+        <div class="chat-header">
+          <span>💬 Ask a follow-up question about this report</span>
+        </div>
+        <div id="chat-messages" class="chat-messages">
+          <div class="chat-bubble assistant">
+            I've read the report. What would you like to know more about?
+          </div>
+        </div>
+        <div class="chat-input-row">
+          <input
+            id="chat-input"
+            type="text"
+            placeholder="e.g. What were the main challenges mentioned?"
+            autocomplete="off"
+          />
+          <button id="chat-send-btn" onclick="sendChatMessage()">Send</button>
+        </div>
+        <p class="chat-note">Powered by Gemini 3.0 Flash · Answers grounded in the report above</p>
+      `;
+
+      document.getElementById("report-container").after(panel);
+
+      document.getElementById("chat-input").addEventListener("keydown", (e) => {
+        if (e.key === "Enter") sendChatMessage();
+      });
+    }
+
+    async function sendChatMessage() {
+      const input = document.getElementById("chat-input");
+      const message = input.value.trim();
+      if (!message) return;
+
+      input.value = "";
+      appendChatBubble("user", message);
+      appendChatBubble("assistant", "...", "typing-indicator");
+
+      try {
+        const res = await fetch(`${API_URL}/chat`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            report: currentReport,
+            history: chatHistory,
+            message: message,
+          }),
+        });
+
+        if (!res.ok) throw new Error(`API error: ${res.status}`);
+        const data = await res.json();
+
+        removeTypingIndicator();
+        appendChatBubble("assistant", data.reply);
+        chatHistory = data.history;
+      } catch (err) {
+        removeTypingIndicator();
+        appendChatBubble("assistant", `⚠️ Error: ${err.message}`);
+      }
+    }
+
+    function appendChatBubble(role, text, extraClass = "") {
+      const messages = document.getElementById("chat-messages");
+      if (!messages) return;
+      const bubble = document.createElement("div");
+      bubble.className = `chat-bubble ${role} ${extraClass}`.trim();
+      bubble.textContent = text;
+      messages.appendChild(bubble);
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    function removeTypingIndicator() {
+      const indicator = document.querySelector(".typing-indicator");
+      if (indicator) indicator.remove();
+    }
+
+    async function initHistory() {
+      injectSidebarHTML();
+      injectLoadingOverlay();
+      await loadHistory();
+    }
+
+    function injectSidebarHTML() {
+      const sidebar = document.createElement("div");
+      sidebar.id = "history-sidebar";
+      sidebar.innerHTML = `
+        <div class="history-header">
+          <span>🗂 Past Research</span>
+          <button class="history-toggle" onclick="toggleSidebar()">✕</button>
+        </div>
+        <div class="history-search-row">
+          <input
+            id="history-search"
+            type="text"
+            placeholder="Search topics..."
+            oninput="handleHistorySearch(this.value)"
+            autocomplete="off"
+          />
+        </div>
+        <div id="history-list" class="history-list">
+          <p class="history-empty">Loading...</p>
+        </div>
+      `;
+      document.body.prepend(sidebar);
+
+      const toggleBtn = document.createElement("button");
+      toggleBtn.id = "history-open-btn";
+      toggleBtn.textContent = "🗂 History";
+      toggleBtn.onclick = toggleSidebar;
+      document.querySelector("main").prepend(toggleBtn);
+    }
+
+    function injectLoadingOverlay() {
+      const overlay = document.createElement("div");
+      overlay.id = "loading-overlay";
+      overlay.className = "hidden";
+      overlay.innerHTML = `
+        <div class="spinner-container">
+          <div class="spinner"></div>
+          <p>Loading research report...</p>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+    }
+
+    function showLoadingOverlay() {
+      const el = document.getElementById("loading-overlay");
+      if (el) el.classList.remove("hidden");
+    }
+
+    function hideLoadingOverlay() {
+      const el = document.getElementById("loading-overlay");
+      if (el) el.classList.add("hidden");
+    }
+
+    async function loadHistory(query = "") {
+      const listEl = document.getElementById("history-list");
+      if (!listEl) return;
+      listEl.innerHTML = '<p class="history-empty">Loading...</p>';
+
+      try {
+        const url = query
+          ? `${API_URL}/history/search/${encodeURIComponent(query)}`
+          : `${API_URL}/history`;
+
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("Failed to load history");
+        const reports = await res.json();
+
+        if (reports.length === 0) {
+          listEl.innerHTML = '<p class="history-empty">No saved reports yet.</p>';
+          return;
+        }
+
+        listEl.innerHTML = reports
+          .map((r) => `
+            <div class="history-item" onclick="loadReportById(${r.id})">
+              <div class="history-item-topic">
+                ${escapeHtml(r.topic)}
+              </div>
+              <div class="history-item-meta">
+                ${formatDate(r.created_at)}
+                <button class="history-delete-btn" onclick="deleteReport(${r.id}, event)">✕</button>
+              </div>
+            </div>
+          `)
+          .join("");
+      } catch (err) {
+        listEl.innerHTML = `<p class="history-empty">Error: ${err.message}</p>`;
+      }
+    }
+
+    async function loadReportById(id) {
+      showLoadingOverlay();
+      try {
+        const res = await fetch(`${API_URL}/history/${id}`);
+        if (!res.ok) throw new Error("Report not found");
+        const data = await res.json();
+
+        window.currentReportMarkdown = data.report;
+        document.getElementById("topic-input").value = data.topic;
+
+        if (typeof showSubQuestions === 'function') showSubQuestions(data.sub_questions);
+        if (typeof showReport === 'function') showReport(data.report, false);
+
+        const reportContainer = document.getElementById("report-container");
+        if (reportContainer) reportContainer.scrollIntoView({ behavior: "smooth" });
+
+        // Close sidebar after selection
+        toggleSidebar();
+      } catch (err) {
+        alert(`Could not load report: ${err.message}`);
+      } finally {
+        hideLoadingOverlay();
+      }
+    }
+
+    async function deleteReport(id, event) {
+      event.stopPropagation();
+      if (!confirm("Delete this report?")) return;
+
+      try {
+        const res = await fetch(`${API_URL}/history/${id}`, { method: "DELETE" });
+        if (!res.ok) throw new Error("Delete failed");
+
+        const item = document.querySelector(`.history-item[data-id="${id}"]`);
+        if (item) item.remove();
+
+        const list = document.getElementById("history-list");
+        if (list && !list.querySelector(".history-item")) {
+          list.innerHTML = '<p class="history-empty">No saved reports yet.</p>';
+        }
+      } catch (err) {
+        alert(`Could not delete: ${err.message}`);
+      }
+    }
+
+    let searchTimeout;
+    function handleHistorySearch(value) {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => loadHistory(value.trim()), 300);
+    }
+
+    function toggleSidebar() {
+      const sidebar = document.getElementById("history-sidebar");
+      if (sidebar) sidebar.classList.toggle("open");
+    }
+
+    function formatDate(isoString) {
+      const d = new Date(isoString);
+      return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    document.addEventListener("DOMContentLoaded", initHistory);
+  </script>
+</body>
+</html>

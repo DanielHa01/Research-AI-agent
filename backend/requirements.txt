@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+groq
+tavily-python
+requests
+beautifulsoup4
+python-dotenv
+pydantic
+httpx
+google-generativeai
+weasyprint
+markdown
